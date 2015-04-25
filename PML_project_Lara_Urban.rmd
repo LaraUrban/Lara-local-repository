@@ -1,0 +1,67 @@
+######################################################################################
+library(caret) # contains training and testing functions; preProcess, featurePlot, train, test, predict, dummyVars, nearZeroVar, prComp
+library(randomForest) # contains method rf; averages prediction probability over many trees
+library(ggplot2) # qplot
+library(Hmisc) # cut2
+library(knitr) # transforms Rmd to md
+library(markdown) # transforms md to HTML
+library(e1071)
+library(rpart) # tree classification; gbm as method for boosting with trees
+library(rattle) # fancyRpartPlot(model$finalModel)
+library(rpart.plot)
+
+setwd("C:/Users/LaraUrban/Desktop")
+load("PML.RData")
+save.image("PML.RData")
+
+#
+testing=read.csv(file.choose(),sep=",")
+dim(testing)  # 20 x 160
+names_testing=names(testing) # 160.col contains problem_id
+
+training=read.csv(file.choose(),sep=",")
+dim(training) # 19622 x 160
+sum(training$classe=="E") # A:5580; B:3797; C:3422; D:3216; E:3607
+names_training=names(training) # 160.col contains classes
+
+# delete near zero variance predictors
+training2=training[,-which(nearZeroVar(training, saveMetrics=TRUE)$nzv==TRUE)]
+dim(training2) # 19622 x 100
+testing2=testing[,-which(nearZeroVar(training, saveMetrics=TRUE)$nzv==TRUE)]
+dim(testing2) # 20 x 100
+
+# futher filtering
+training3=training2[,-c(1,5)] # 19622 x 98
+code=dummyVars(~user_name,data=training3) # users as dummy variables
+training3[,1]=predict(code,training3)
+
+
+# test
+testing3=testing2[,-c(1,5)] # 30 x 98
+testing3[,1]=predict(code,testing3)
+for (i in 1:20) {
+  for (j in 1:98) {
+    if(is.na(testing3[i,j])) {
+      testing3[i,j]=as.numeric(0)
+    }
+  }
+}
+
+# training in model2
+model2=train(training3$classe~.,preProcess=c("knnImpute","pca"),method="rpart",data=training3[,-98])
+fancyRpartPlot(model2$finalModel)
+model2$finalModel
+
+# 
+prednow=predict(model,testing3[,-98])
+table(prednow,testing3$problem_id)
+
+  1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20
+A 1 0 1 1 1 0 0 1 1  1  0  1  0  1  0  0  1  0  1  0
+B 0 0 0 0 0 0 0 0 0  0  0  0  0  0  0  0  0  0  0  1
+C 0 0 0 0 0 0 0 0 0  0  0  0  0  0  0  0  0  0  0  0
+D 0 0 0 0 0 0 0 0 0  0  0  0  0  0  0  0  0  0  0  0
+E 0 1 0 0 0 1 1 0 0  0  1  0  1  0  1  1  0  1  0  0
+
+
+####################################################################################
